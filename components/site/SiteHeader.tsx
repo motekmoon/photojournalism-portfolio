@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Story } from '@/types';
 
 export default function SiteHeader() {
@@ -38,18 +39,25 @@ export default function SiteHeader() {
   }, [isStoriesDropdownOpen]);
 
   return (
-    <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
+    <header className="sticky top-0 z-50 bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-8">
-          <Link href="/" className="flex items-center">
-            <span className="text-xl font-bold text-gray-900">Photojournalism Portfolio</span>
+          <Link href="/" className="flex items-center h-full">
+            <Image
+              src="/zuschuss-logo.PNG"
+              alt="ZUSCHUSS"
+              width={120}
+              height={26}
+              className="h-[26px] w-auto object-contain"
+              priority
+            />
           </Link>
           
           <nav className="flex items-center gap-8">
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsStoriesDropdownOpen(!isStoriesDropdownOpen)}
-                className="text-gray-900 hover:text-gray-700 focus:outline-none focus:text-gray-700 text-sm font-medium"
+                className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-medium"
               >
                 Stories
               </button>
@@ -78,7 +86,7 @@ export default function SiteHeader() {
             
             <Link
               href="/about"
-              className="text-gray-900 hover:text-gray-700 focus:outline-none focus:text-gray-700 text-sm font-medium"
+              className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-medium"
             >
               About
             </Link>
