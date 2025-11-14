@@ -55,6 +55,8 @@ export interface Media {
   } | null;
   is_featured: boolean;
   is_masthead: boolean;
+  masthead_order: number | null;
+  featured_order: number | null;
   story_id: number | null;
   created_at: Date;
   updated_at: Date;

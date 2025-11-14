@@ -53,6 +53,8 @@ export async function initializeSchema() {
       all_metadata JSONB,
       is_featured BOOLEAN DEFAULT FALSE,
       is_masthead BOOLEAN DEFAULT FALSE,
+      masthead_order INTEGER,
+      featured_order INTEGER,
       story_id INTEGER REFERENCES stories(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
@@ -68,6 +70,25 @@ export async function initializeSchema() {
         WHERE table_name = 'media' AND column_name = 'all_metadata'
       ) THEN
         ALTER TABLE media ADD COLUMN all_metadata JSONB;
+      END IF;
+    END $$;
+  `;
+
+  // Add order columns if they don't exist (for existing databases)
+  const addOrderColumns = `
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'media' AND column_name = 'masthead_order'
+      ) THEN
+        ALTER TABLE media ADD COLUMN masthead_order INTEGER;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'media' AND column_name = 'featured_order'
+      ) THEN
+        ALTER TABLE media ADD COLUMN featured_order INTEGER;
       END IF;
     END $$;
   `;
@@ -93,6 +114,7 @@ export async function initializeSchema() {
     await query(createStoryImagesTable);
     await query(createMediaTable);
     await query(addAllMetadataColumn); // Add all_metadata column if needed
+    await query(addOrderColumns); // Add order columns if needed
     await query(createSettingsTable);
     await query(createPagesTable);
     console.log('Database schema initialized successfully');

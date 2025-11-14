@@ -4,6 +4,13 @@ import { useState, useEffect } from 'react';
 import { CldImage } from 'next-cloudinary';
 import type { Media } from '@/types';
 
+interface DraggableMediaItemProps {
+  media: Media;
+  type: 'masthead' | 'featured';
+  onToggle: (media: Media) => void;
+  onDragDrop: (draggedId: number, targetId: number) => void;
+}
+
 export default function MainPageEditor() {
   const [mastheadImages, setMastheadImages] = useState<Media[]>([]);
   const [featuredImages, setFeaturedImages] = useState<Media[]>([]);
@@ -99,6 +106,61 @@ export default function MainPageEditor() {
     }
   };
 
+  const handleDragDrop = async (type: 'masthead' | 'featured', draggedId: number, targetId: number) => {
+    if (draggedId === targetId) return;
+
+    const currentImages = type === 'masthead' ? mastheadImages : featuredImages;
+    const sortedImages = [...currentImages].sort((a, b) => {
+      const aOrder = type === 'masthead' ? (a.masthead_order ?? 999) : (a.featured_order ?? 999);
+      const bOrder = type === 'masthead' ? (b.masthead_order ?? 999) : (b.featured_order ?? 999);
+      return aOrder - bOrder;
+    });
+
+    const draggedIndex = sortedImages.findIndex(img => img.id === draggedId);
+    const targetIndex = sortedImages.findIndex(img => img.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Create new order by moving dragged item to target position
+    const newImages = [...sortedImages];
+    const [draggedItem] = newImages.splice(draggedIndex, 1);
+    newImages.splice(targetIndex, 0, draggedItem);
+
+    // Optimistically update local state immediately (no page refresh)
+    const reorderedImages = newImages.map((img, index) => ({
+      ...img,
+      [type === 'masthead' ? 'masthead_order' : 'featured_order']: index,
+    }));
+
+    if (type === 'masthead') {
+      setMastheadImages(reorderedImages);
+    } else {
+      setFeaturedImages(reorderedImages);
+    }
+
+    try {
+      const response = await fetch('/api/media/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          mediaIds: newImages.map(img => img.id),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reorder images');
+      }
+      // Success - no need to refetch since we've already updated the UI optimistically
+    } catch (err: any) {
+      console.error('Error reordering images:', err);
+      // Revert to original order on error by refetching
+      fetchData();
+      alert('Error reordering images: ' + err.message);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -144,23 +206,14 @@ export default function MainPageEditor() {
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {mastheadImages.map((media) => (
-              <div key={media.id} className="relative group">
-                <div className="aspect-video relative rounded-lg overflow-hidden bg-gray-100">
-                  <CldImage
-                    src={media.cloudinary_public_id}
-                    alt={media.caption || 'Masthead image'}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <button
-                  onClick={() => handleToggleMasthead(media)}
-                  className="mt-2 w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-                >
-                  Remove from Masthead
-                </button>
-              </div>
+            {[...mastheadImages].sort((a, b) => (a.masthead_order ?? 999) - (b.masthead_order ?? 999)).map((media) => (
+              <DraggableMediaItem
+                key={media.id}
+                media={media}
+                type="masthead"
+                onToggle={handleToggleMasthead}
+                onDragDrop={(draggedId, targetId) => handleDragDrop('masthead', draggedId, targetId)}
+              />
             ))}
           </div>
         )}
@@ -194,23 +247,14 @@ export default function MainPageEditor() {
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {featuredImages.map((media) => (
-              <div key={media.id} className="relative group">
-                <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
-                  <CldImage
-                    src={media.cloudinary_public_id}
-                    alt={media.caption || 'Featured image'}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <button
-                  onClick={() => handleToggleFeatured(media)}
-                  className="mt-2 w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-                >
-                  Remove from Featured
-                </button>
-              </div>
+            {[...featuredImages].sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999)).map((media) => (
+              <DraggableMediaItem
+                key={media.id}
+                media={media}
+                type="featured"
+                onToggle={handleToggleFeatured}
+                onDragDrop={(draggedId, targetId) => handleDragDrop('featured', draggedId, targetId)}
+              />
             ))}
           </div>
         )}
@@ -270,6 +314,75 @@ export default function MainPageEditor() {
           ))}
         </div>
       </div>
+    </div>
+  );
+}
+
+function DraggableMediaItem({ media, type, onToggle, onDragDrop }: DraggableMediaItemProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', media.id.toString());
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDragOver(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+    if (draggedId && draggedId !== media.id) {
+      onDragDrop(draggedId, media.id);
+    }
+  };
+
+  const aspectClass = type === 'masthead' ? 'aspect-video' : 'aspect-square';
+  const label = type === 'masthead' ? 'Masthead' : 'Featured';
+
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative group cursor-move transition-all ${
+        isDragging ? 'opacity-50' : ''
+      } ${
+        dragOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+      }`}
+    >
+      <div className={`${aspectClass} relative rounded-lg overflow-hidden bg-gray-100`}>
+        <CldImage
+          src={media.cloudinary_public_id}
+          alt={media.caption || `${label} image`}
+          fill
+          className="object-cover"
+        />
+      </div>
+      <button
+        onClick={() => onToggle(media)}
+        className="mt-2 w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+      >
+        Remove from {label}
+      </button>
     </div>
   );
 }

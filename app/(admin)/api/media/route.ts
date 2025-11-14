@@ -24,13 +24,16 @@ export async function GET(request: NextRequest) {
 
     if (isFeatured === 'true') {
       queryText += ` AND is_featured = true`;
-    }
-
-    if (isMasthead === 'true') {
+      // Order by featured_order when filtering for featured images
+      queryText += ' ORDER BY featured_order ASC NULLS LAST, created_at DESC';
+    } else if (isMasthead === 'true') {
       queryText += ` AND is_masthead = true`;
+      // Order by masthead_order when filtering for masthead images
+      queryText += ' ORDER BY masthead_order ASC NULLS LAST, created_at DESC';
+    } else {
+      // Default ordering for all media
+      queryText += ' ORDER BY created_at DESC';
     }
-
-    queryText += ' ORDER BY created_at DESC';
 
     const media = await query<Media>(queryText, params);
 

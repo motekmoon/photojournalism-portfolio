@@ -44,6 +44,41 @@ export async function PUT(
     const body = await request.json();
     const { caption, is_featured, is_masthead, story_id } = body;
 
+    // If toggling masthead/featured on, set order to end of list
+    if (is_masthead === true) {
+      const maxOrder = await queryOne<{ max: number }>(
+        'SELECT COALESCE(MAX(masthead_order), -1) as max FROM media WHERE is_masthead = true'
+      );
+      const nextOrder = (maxOrder?.max ?? -1) + 1;
+      await query(
+        'UPDATE media SET masthead_order = $1 WHERE id = $2',
+        [nextOrder, id]
+      );
+    } else if (is_masthead === false) {
+      // Clear order when removing from masthead
+      await query(
+        'UPDATE media SET masthead_order = NULL WHERE id = $1',
+        [id]
+      );
+    }
+
+    if (is_featured === true) {
+      const maxOrder = await queryOne<{ max: number }>(
+        'SELECT COALESCE(MAX(featured_order), -1) as max FROM media WHERE is_featured = true'
+      );
+      const nextOrder = (maxOrder?.max ?? -1) + 1;
+      await query(
+        'UPDATE media SET featured_order = $1 WHERE id = $2',
+        [nextOrder, id]
+      );
+    } else if (is_featured === false) {
+      // Clear order when removing from featured
+      await query(
+        'UPDATE media SET featured_order = NULL WHERE id = $1',
+        [id]
+      );
+    }
+
     const updateMedia = `
       UPDATE media 
       SET 
