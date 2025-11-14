@@ -50,7 +50,25 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { title, year, location, narrative, featured_image_public_id } = body;
+    const { title, year, location, narrative, featured_image_public_id, is_featured } = body;
+
+    // If toggling featured on, set order to end of list
+    if (is_featured === true) {
+      const maxOrder = await queryOne<{ max: number }>(
+        'SELECT COALESCE(MAX(featured_order), -1) as max FROM stories WHERE is_featured = true'
+      );
+      const nextOrder = (maxOrder?.max ?? -1) + 1;
+      await query(
+        'UPDATE stories SET featured_order = $1 WHERE id = $2',
+        [nextOrder, id]
+      );
+    } else if (is_featured === false) {
+      // Clear order when removing from featured
+      await query(
+        'UPDATE stories SET featured_order = NULL WHERE id = $1',
+        [id]
+      );
+    }
 
     const updateStory = `
       UPDATE stories 
@@ -60,8 +78,9 @@ export async function PUT(
         location = $3,
         narrative = $4,
         featured_image_public_id = $5,
+        is_featured = COALESCE($6, is_featured),
         updated_at = NOW()
-      WHERE id = $6
+      WHERE id = $7
       RETURNING *
     `;
 
@@ -71,6 +90,7 @@ export async function PUT(
       location || null,
       narrative || null,
       featured_image_public_id || null,
+      is_featured !== undefined ? is_featured : null,
       id,
     ]);
 

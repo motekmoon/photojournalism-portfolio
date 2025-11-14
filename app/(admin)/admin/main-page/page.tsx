@@ -2,19 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { CldImage } from 'next-cloudinary';
-import type { Media } from '@/types';
+import type { Media, Story } from '@/types';
 
 interface DraggableMediaItemProps {
   media: Media;
-  type: 'masthead' | 'featured';
   onToggle: (media: Media) => void;
+  onDragDrop: (draggedId: number, targetId: number) => void;
+}
+
+interface DraggableStoryItemProps {
+  story: Story;
+  onToggle: (story: Story) => void;
   onDragDrop: (draggedId: number, targetId: number) => void;
 }
 
 export default function MainPageEditor() {
   const [mastheadImages, setMastheadImages] = useState<Media[]>([]);
-  const [featuredImages, setFeaturedImages] = useState<Media[]>([]);
+  const [featuredStories, setFeaturedStories] = useState<Story[]>([]);
   const [allMedia, setAllMedia] = useState<Media[]>([]);
+  const [allStories, setAllStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -25,27 +31,28 @@ export default function MainPageEditor() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [mastheadRes, featuredRes, allRes] = await Promise.all([
+      const [mastheadRes, featuredStoriesRes, allMediaRes, allStoriesRes] = await Promise.all([
         fetch('/api/media?is_masthead=true'),
-        fetch('/api/media?is_featured=true'),
+        fetch('/api/stories?is_featured=true'),
         fetch('/api/media'),
+        fetch('/api/stories'),
       ]);
 
       const mastheadData = await mastheadRes.json();
-      const featuredData = await featuredRes.json();
-      const allData = await allRes.json();
+      const featuredStoriesData = await featuredStoriesRes.json();
+      const allMediaData = await allMediaRes.json();
+      const allStoriesData = await allStoriesRes.json();
 
-      // Handle responses gracefully, even if there are errors
       setMastheadImages(mastheadData.media || []);
-      setFeaturedImages(featuredData.media || []);
-      setAllMedia(allData.media || []);
+      setFeaturedStories(featuredStoriesData.stories || []);
+      setAllMedia(allMediaData.media || []);
+      setAllStories(allStoriesData.stories || []);
     } catch (err: any) {
       console.error('Error loading data:', err);
-      // Set empty arrays on error to show empty states
       setMastheadImages([]);
-      setFeaturedImages([]);
+      setFeaturedStories([]);
       setAllMedia([]);
-      // Only show alert for non-network errors
+      setAllStories([]);
       if (err.message && !err.message.includes('Failed to fetch')) {
         alert('Error loading data: ' + err.message);
       }
@@ -71,13 +78,13 @@ export default function MainPageEditor() {
     }
   };
 
-  const handleToggleFeatured = async (media: Media) => {
+  const handleToggleFeaturedStory = async (story: Story) => {
     try {
-      const response = await fetch(`/api/media/${media.id}`, {
+      const response = await fetch(`/api/stories/${story.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          is_featured: !media.is_featured,
+          is_featured: !story.is_featured,
         }),
       });
 
@@ -106,44 +113,32 @@ export default function MainPageEditor() {
     }
   };
 
-  const handleDragDrop = async (type: 'masthead' | 'featured', draggedId: number, targetId: number) => {
+  const handleDragDropMasthead = async (draggedId: number, targetId: number) => {
     if (draggedId === targetId) return;
 
-    const currentImages = type === 'masthead' ? mastheadImages : featuredImages;
-    const sortedImages = [...currentImages].sort((a, b) => {
-      const aOrder = type === 'masthead' ? (a.masthead_order ?? 999) : (a.featured_order ?? 999);
-      const bOrder = type === 'masthead' ? (b.masthead_order ?? 999) : (b.featured_order ?? 999);
-      return aOrder - bOrder;
-    });
-
+    const sortedImages = [...mastheadImages].sort((a, b) => (a.masthead_order ?? 999) - (b.masthead_order ?? 999));
     const draggedIndex = sortedImages.findIndex(img => img.id === draggedId);
     const targetIndex = sortedImages.findIndex(img => img.id === targetId);
 
     if (draggedIndex === -1 || targetIndex === -1) return;
 
-    // Create new order by moving dragged item to target position
     const newImages = [...sortedImages];
     const [draggedItem] = newImages.splice(draggedIndex, 1);
     newImages.splice(targetIndex, 0, draggedItem);
 
-    // Optimistically update local state immediately (no page refresh)
     const reorderedImages = newImages.map((img, index) => ({
       ...img,
-      [type === 'masthead' ? 'masthead_order' : 'featured_order']: index,
+      masthead_order: index,
     }));
 
-    if (type === 'masthead') {
-      setMastheadImages(reorderedImages);
-    } else {
-      setFeaturedImages(reorderedImages);
-    }
+    setMastheadImages(reorderedImages);
 
     try {
       const response = await fetch('/api/media/reorder', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type,
+          type: 'masthead',
           mediaIds: newImages.map(img => img.id),
         }),
       });
@@ -152,12 +147,50 @@ export default function MainPageEditor() {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to reorder images');
       }
-      // Success - no need to refetch since we've already updated the UI optimistically
     } catch (err: any) {
       console.error('Error reordering images:', err);
-      // Revert to original order on error by refetching
       fetchData();
       alert('Error reordering images: ' + err.message);
+    }
+  };
+
+  const handleDragDropStories = async (draggedId: number, targetId: number) => {
+    if (draggedId === targetId) return;
+
+    const sortedStories = [...featuredStories].sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999));
+    const draggedIndex = sortedStories.findIndex(s => s.id === draggedId);
+    const targetIndex = sortedStories.findIndex(s => s.id === targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newStories = [...sortedStories];
+    const [draggedItem] = newStories.splice(draggedIndex, 1);
+    newStories.splice(targetIndex, 0, draggedItem);
+
+    const reorderedStories = newStories.map((story, index) => ({
+      ...story,
+      featured_order: index,
+    }));
+
+    setFeaturedStories(reorderedStories);
+
+    try {
+      const response = await fetch('/api/stories/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          storyIds: newStories.map(s => s.id),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reorder stories');
+      }
+    } catch (err: any) {
+      console.error('Error reordering stories:', err);
+      fetchData();
+      alert('Error reordering stories: ' + err.message);
     }
   };
 
@@ -174,7 +207,7 @@ export default function MainPageEditor() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Main Page Editor</h1>
         <p className="mt-2 text-sm text-gray-900">
-          Configure images for the main page masthead carousel and featured section
+          Configure images for the main page masthead carousel and featured stories section
         </p>
       </div>
 
@@ -210,9 +243,8 @@ export default function MainPageEditor() {
               <DraggableMediaItem
                 key={media.id}
                 media={media}
-                type="masthead"
                 onToggle={handleToggleMasthead}
-                onDragDrop={(draggedId, targetId) => handleDragDrop('masthead', draggedId, targetId)}
+                onDragDrop={handleDragDropMasthead}
               />
             ))}
           </div>
@@ -221,39 +253,24 @@ export default function MainPageEditor() {
 
       <div className="bg-white shadow rounded-lg p-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Featured Images</h2>
-          <button
-            onClick={() => {
-              const nonFeatured = allMedia.filter((m) => !m.is_featured);
-              if (nonFeatured.length > 0) {
-                handleBatchUpdate(
-                  nonFeatured.slice(0, 10).map((m) => m.id),
-                  { is_featured: true }
-                );
-              }
-            }}
-            className="text-sm text-gray-900 hover:text-gray-900"
-          >
-            Add First 10 Available
-          </button>
+          <h2 className="text-xl font-semibold text-gray-900">Featured Stories</h2>
         </div>
         <p className="text-sm text-gray-900 mb-4">
-          Images displayed in the featured section below the masthead
+          Stories displayed in the featured section below the masthead. Each story will show its featured image.
         </p>
 
-        {featuredImages.length === 0 ? (
+        {featuredStories.length === 0 ? (
           <p className="text-gray-900 text-center py-8">
-            No featured images. Mark images as "Featured" to add them here.
+            No featured stories. Mark stories as "Featured" to add them here.
           </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {[...featuredImages].sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999)).map((media) => (
-              <DraggableMediaItem
-                key={media.id}
-                media={media}
-                type="featured"
-                onToggle={handleToggleFeatured}
-                onDragDrop={(draggedId, targetId) => handleDragDrop('featured', draggedId, targetId)}
+            {[...featuredStories].sort((a, b) => (a.featured_order ?? 999) - (b.featured_order ?? 999)).map((story) => (
+              <DraggableStoryItem
+                key={story.id}
+                story={story}
+                onToggle={handleToggleFeaturedStory}
+                onDragDrop={handleDragDropStories}
               />
             ))}
           </div>
@@ -261,9 +278,56 @@ export default function MainPageEditor() {
       </div>
 
       <div className="bg-white shadow rounded-lg p-6">
+        <h2 className="text-xl font-semibold mb-4 text-gray-900">All Stories</h2>
+        <p className="text-sm text-gray-900 mb-4">
+          Click to toggle featured status
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {allStories.map((story) => (
+            <div key={story.id} className="relative group">
+              {story.featured_image_public_id ? (
+                <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
+                  <CldImage
+                    src={story.featured_image_public_id}
+                    alt={story.title}
+                    fill
+                    className="object-cover"
+                  />
+                  {story.is_featured && (
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                        Featured
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
+                  <span className="text-gray-500 text-sm">No featured image</span>
+                </div>
+              )}
+              <div className="mt-2">
+                <p className="text-sm font-medium text-gray-900 truncate">{story.title}</p>
+                <button
+                  onClick={() => handleToggleFeaturedStory(story)}
+                  className={`mt-1 w-full px-2 py-1 text-xs rounded ${
+                    story.is_featured
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                  }`}
+                >
+                  {story.is_featured ? 'Featured' : 'Add to Featured'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-semibold mb-4 text-gray-900">All Media</h2>
         <p className="text-sm text-gray-900 mb-4">
-          Click to toggle masthead or featured status
+          Click to toggle masthead status
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {allMedia.map((media) => (
@@ -275,41 +339,24 @@ export default function MainPageEditor() {
                   fill
                   className="object-cover"
                 />
-                <div className="absolute top-2 left-2 flex flex-col space-y-1">
-                  {media.is_masthead && (
+                {media.is_masthead && (
+                  <div className="absolute top-2 left-2">
                     <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
                       Masthead
                     </span>
-                  )}
-                  {media.is_featured && (
-                    <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
-                      Featured
-                    </span>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-              <div className="mt-2 flex space-x-1">
-                <button
-                  onClick={() => handleToggleMasthead(media)}
-                  className={`flex-1 px-2 py-1 text-xs rounded ${
-                    media.is_masthead
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                  }`}
-                >
-                  {media.is_masthead ? 'Masthead' : 'Add Masthead'}
-                </button>
-                <button
-                  onClick={() => handleToggleFeatured(media)}
-                  className={`flex-1 px-2 py-1 text-xs rounded ${
-                    media.is_featured
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                  }`}
-                >
-                  {media.is_featured ? 'Featured' : 'Add Featured'}
-                </button>
-              </div>
+              <button
+                onClick={() => handleToggleMasthead(media)}
+                className={`mt-2 w-full px-2 py-1 text-xs rounded ${
+                  media.is_masthead
+                    ? 'bg-green-100 text-green-700'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                }`}
+              >
+                {media.is_masthead ? 'Masthead' : 'Add to Masthead'}
+              </button>
             </div>
           ))}
         </div>
@@ -318,7 +365,7 @@ export default function MainPageEditor() {
   );
 }
 
-function DraggableMediaItem({ media, type, onToggle, onDragDrop }: DraggableMediaItemProps) {
+function DraggableMediaItem({ media, onToggle, onDragDrop }: DraggableMediaItemProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
@@ -352,8 +399,71 @@ function DraggableMediaItem({ media, type, onToggle, onDragDrop }: DraggableMedi
     }
   };
 
-  const aspectClass = type === 'masthead' ? 'aspect-video' : 'aspect-square';
-  const label = type === 'masthead' ? 'Masthead' : 'Featured';
+  return (
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className={`relative group cursor-move transition-all ${
+        isDragging ? 'opacity-50' : ''
+      } ${
+        dragOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+      }`}
+    >
+      <div className="aspect-video relative rounded-lg overflow-hidden bg-gray-100">
+        <CldImage
+          src={media.cloudinary_public_id}
+          alt={media.caption || 'Masthead image'}
+          fill
+          className="object-cover"
+        />
+      </div>
+      <button
+        onClick={() => onToggle(media)}
+        className="mt-2 w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+      >
+        Remove from Masthead
+      </button>
+    </div>
+  );
+}
+
+function DraggableStoryItem({ story, onToggle, onDragDrop }: DraggableStoryItemProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', story.id.toString());
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDragOver(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+    if (draggedId && draggedId !== story.id) {
+      onDragDrop(draggedId, story.id);
+    }
+  };
 
   return (
     <div
@@ -369,21 +479,29 @@ function DraggableMediaItem({ media, type, onToggle, onDragDrop }: DraggableMedi
         dragOver ? 'ring-2 ring-blue-500 ring-offset-2' : ''
       }`}
     >
-      <div className={`${aspectClass} relative rounded-lg overflow-hidden bg-gray-100`}>
-        <CldImage
-          src={media.cloudinary_public_id}
-          alt={media.caption || `${label} image`}
-          fill
-          className="object-cover"
-        />
+      {story.featured_image_public_id ? (
+        <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-100">
+          <CldImage
+            src={story.featured_image_public_id}
+            alt={story.title}
+            fill
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        <div className="aspect-square relative rounded-lg overflow-hidden bg-gray-200 flex items-center justify-center">
+          <span className="text-gray-500 text-sm text-center px-2">No featured image</span>
+        </div>
+      )}
+      <div className="mt-2">
+        <p className="text-sm font-medium text-gray-900 truncate mb-1">{story.title}</p>
+        <button
+          onClick={() => onToggle(story)}
+          className="w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
+        >
+          Remove from Featured
+        </button>
       </div>
-      <button
-        onClick={() => onToggle(media)}
-        className="mt-2 w-full px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200"
-      >
-        Remove from {label}
-      </button>
     </div>
   );
 }
-

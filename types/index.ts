@@ -6,6 +6,8 @@ export interface Story {
   location: string | null;
   narrative: string | null;
   featured_image_public_id: string | null;
+  is_featured: boolean;
+  featured_order: number | null;
   created_at: Date;
   updated_at: Date;
 }

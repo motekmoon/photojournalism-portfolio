@@ -6,10 +6,19 @@ import type { Story } from '@/types';
 // GET all stories
 export async function GET(request: NextRequest) {
   try {
-    const stories = await query<Story>(`
-      SELECT * FROM stories 
-      ORDER BY created_at DESC
-    `);
+    const { searchParams } = new URL(request.url);
+    const isFeatured = searchParams.get('is_featured');
+
+    let queryText = 'SELECT * FROM stories WHERE 1=1';
+    
+    if (isFeatured === 'true') {
+      queryText += ` AND is_featured = true`;
+      queryText += ' ORDER BY featured_order ASC NULLS LAST, created_at DESC';
+    } else {
+      queryText += ' ORDER BY created_at DESC';
+    }
+
+    const stories = await query<Story>(queryText);
 
     return NextResponse.json({ stories: stories || [] });
   } catch (error: any) {
