@@ -88,9 +88,17 @@ export default function MainPageEditor() {
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to update');
+      if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData.details 
+          ? `${errorData.error}: ${errorData.details}`
+          : errorData.error || 'Failed to update';
+        throw new Error(errorMessage);
+      }
+
       fetchData();
     } catch (err: any) {
+      console.error('Error toggling featured story:', err);
       alert('Error updating: ' + err.message);
     }
   };
@@ -292,6 +300,7 @@ export default function MainPageEditor() {
                     alt={story.title}
                     fill
                     className="object-cover"
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
                   />
                   {story.is_featured && (
                     <div className="absolute top-2 left-2">
@@ -338,6 +347,7 @@ export default function MainPageEditor() {
                   alt={media.caption || 'Media'}
                   fill
                   className="object-cover"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
                 />
                 {media.is_masthead && (
                   <div className="absolute top-2 left-2">
@@ -419,6 +429,7 @@ function DraggableMediaItem({ media, onToggle, onDragDrop }: DraggableMediaItemP
           alt={media.caption || 'Masthead image'}
           fill
           className="object-cover"
+          sizes="(max-width: 768px) 100vw, 50vw"
         />
       </div>
       <button
@@ -486,6 +497,7 @@ function DraggableStoryItem({ story, onToggle, onDragDrop }: DraggableStoryItemP
             alt={story.title}
             fill
             className="object-cover"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 20vw"
           />
         </div>
       ) : (
