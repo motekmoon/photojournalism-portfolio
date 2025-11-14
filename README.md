@@ -14,7 +14,14 @@ A photography portfolio site built with Next.js, Cloudinary, and Vercel Postgres
 ## Features
 
 ### Public Site
-- Main page with masthead carousel and featured images
+- **Main Page:**
+  - Sticky header (32px) with logo and navigation
+  - Stories dropdown menu listing all featured stories
+  - Masthead carousel with horizontal scrolling and pagination dots
+  - Featured stories section with vertical tiling
+  - Story title overlay and "See more from this story" button on each featured story
+  - 3:2 aspect ratio (5760×3840) for all images
+  - Full image display in masthead (no cropping)
 - Story detail pages with image galleries
 - About page with dynamic content
 
@@ -60,7 +67,11 @@ A photography portfolio site built with Next.js, Cloudinary, and Vercel Postgres
 - Comprehensive metadata display in media detail pages
 
 #### Page Editors
-- Main page editor for configuring masthead and featured images
+- **Main Page Editor:**
+  - Configure masthead images (drag-and-drop reordering)
+  - Manage featured stories (stories with is_featured flag)
+  - Drag-and-drop reordering for featured stories
+  - Display story featured images in featured section
 - About page editor with markdown support
 - Settings page for site-wide configuration
 
@@ -114,23 +125,28 @@ http://localhost:3000/admin
 
 The application uses the following tables:
 
-- **stories**: Story metadata (title, year, location, narrative, featured image)
+- **stories**: Story metadata (title, year, location, narrative, featured image, is_featured, featured_order)
 - **story_images**: Images within stories (with order_index for sorting)
-- **media**: Media library (Cloudinary public IDs, metadata, flags)
+- **media**: Media library (Cloudinary public IDs, metadata, flags, masthead_order, featured_order)
 - **settings**: Site-wide settings (key-value pairs)
 - **pages**: Dynamic page content (about page, etc.)
 
 ## API Routes
 
 ### Admin Routes (`/api/*`)
-- `GET/POST /api/stories` - List/create stories
+- `GET/POST /api/stories` - List/create stories (supports ?is_featured=true filter)
 - `GET/PUT/DELETE /api/stories/[id]` - Story operations
+- `PUT /api/stories/reorder` - Reorder featured stories
 - `GET/POST/PUT/DELETE /api/stories/[id]/images` - Story image management
-- `GET/PUT/DELETE /api/media` - Media library operations
+- `GET/PUT/DELETE /api/media` - Media library operations (supports ?is_masthead=true, ?is_featured=true filters)
 - `GET/PUT/DELETE /api/media/[id]` - Individual media operations
+- `PUT /api/media/reorder` - Reorder masthead/featured images
+- `GET /api/media/dimensions` - Get image dimensions from Cloudinary
 - `POST /api/cloudinary/upload` - Image upload with metadata extraction
 - `GET /api/init` - Initialize database schema
 - `GET /api/check-tables` - Check database table existence
+- `POST /api/migrate/add-order-columns` - Add order columns to media table
+- `POST /api/migrate/add-story-featured-columns` - Add featured columns to stories table
 
 ## Image Upload Features
 
@@ -147,6 +163,9 @@ The application uses the following tables:
 - All text uses `text-gray-900` for better visibility
 - Batch operations support select all / clear selection
 - Error handling with detailed logging in development mode
+- Images use 3:2 aspect ratio (5760×3840)
+- Masthead displays full images with `object-contain` (no cropping)
+- Featured stories use story's featured_image_public_id, not separate featured images
 
 ## Deployment
 
