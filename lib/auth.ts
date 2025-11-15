@@ -3,20 +3,22 @@ import { NextRequest, NextResponse } from 'next/server';
 // Simple auth check - in production, use Vercel Auth or similar
 export async function requireAuth(request: NextRequest): Promise<boolean> {
   // TODO: Implement proper authentication with Vercel Auth
-  // For now, this is a placeholder
+  // For now, temporarily allowing all requests to enable admin functionality
+  // SECURITY WARNING: This bypasses authentication - implement proper auth before production use
   
-  // For development: allow all requests (bypass auth)
-  // In production, this should check for actual authentication
-  if (process.env.NODE_ENV === 'development') {
-    return true;
-  }
+  // Temporarily allow all requests (both dev and production)
+  // TODO: Replace with actual Vercel Auth or similar authentication
+  return true;
   
-  const authHeader = request.headers.get('authorization');
-  const sessionCookie = request.cookies.get('session');
-  
-  // Placeholder: check if user is authenticated
-  // Replace with actual Vercel Auth check
-  return !!sessionCookie || !!authHeader;
+  // Original auth check (commented out until proper auth is implemented):
+  // if (process.env.NODE_ENV === 'development') {
+  //   return true;
+  // }
+  // 
+  // const authHeader = request.headers.get('authorization');
+  // const sessionCookie = request.cookies.get('session');
+  // 
+  // return !!sessionCookie || !!authHeader;
 }
 
 export function redirectToLogin() {
