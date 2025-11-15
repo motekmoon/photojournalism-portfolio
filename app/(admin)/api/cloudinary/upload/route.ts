@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
           processedImage = processedImage.jpeg({ quality: 85, mozjpeg: true });
         }
 
-        buffer = await processedImage.toBuffer();
+        buffer = Buffer.from(await processedImage.toBuffer());
 
         // If still too large, compress more aggressively (but keep metadata)
         if (buffer.length > MAX_SIZE) {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
             processedImage = processedImage.jpeg({ quality: 75, mozjpeg: true });
           }
           
-          buffer = await processedImage.toBuffer();
+          buffer = Buffer.from(await processedImage.toBuffer());
         }
 
         // If still too large, one more aggressive compression (but keep metadata)
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
             processedImage = processedImage.jpeg({ quality: 70, mozjpeg: true });
           }
           
-          buffer = await processedImage.toBuffer();
+          buffer = Buffer.from(await processedImage.toBuffer());
         }
 
         console.log(`Compressed image from ${(originalSize / 1024 / 1024).toFixed(2)}MB to ${(buffer.length / 1024 / 1024).toFixed(2)}MB (metadata preserved)`);
