@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import SiteHeader from '@/components/site/SiteHeader';
-import StoryFeaturedImage from '@/components/story/StoryFeaturedImage';
-import StoryImageGallery from '@/components/story/StoryImageGallery';
+import StoryFeaturedImageAlt from '@/components/story/StoryFeaturedImageAlt';
+import StoryImageGalleryAlt from '@/components/story/StoryImageGalleryAlt';
 import type { Story, StoryImage } from '@/types';
 
 async function getStoryBySlug(slug: string): Promise<{ story: Story; images: StoryImage[] } | null> {
@@ -47,7 +47,7 @@ export default async function StoryPage({ params }: { params: Promise<{ slug: st
       
       {/* Full bleed featured image with overlay */}
       {featuredImage && (
-        <StoryFeaturedImage
+        <StoryFeaturedImageAlt
           image={featuredImage}
           story={story}
         />
@@ -56,7 +56,7 @@ export default async function StoryPage({ params }: { params: Promise<{ slug: st
       {/* Additional images with captions */}
       {otherImages.length > 0 && (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <StoryImageGallery images={otherImages} storyTitle={story.title} />
+          <StoryImageGalleryAlt images={otherImages} storyTitle={story.title} />
         </main>
       )}
     </div>

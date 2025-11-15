@@ -23,7 +23,7 @@ export default function StoryImageGalleryAlt({ images, storyTitle }: StoryImageG
             />
           </div>
           {image.caption && (
-            <p className="text-gray-600 text-center text-lg italic max-w-4xl mx-auto">
+            <p className="text-gray-600 text-left text-lg italic max-w-4xl mx-auto">
               {image.caption}
             </p>
           )}

@@ -126,8 +126,22 @@ export async function initializeSchema() {
     CREATE TABLE IF NOT EXISTS pages (
       slug VARCHAR(255) PRIMARY KEY,
       content TEXT NOT NULL,
+      profile_image_public_id VARCHAR(255),
       updated_at TIMESTAMP DEFAULT NOW()
     );
+  `;
+
+  // Add profile_image_public_id column if it doesn't exist (for existing databases)
+  const addProfileImageColumn = `
+    DO $$ 
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'pages' AND column_name = 'profile_image_public_id'
+      ) THEN
+        ALTER TABLE pages ADD COLUMN profile_image_public_id VARCHAR(255);
+      END IF;
+    END $$;
   `;
 
   try {
@@ -139,6 +153,7 @@ export async function initializeSchema() {
     await query(addStoryFeaturedColumns); // Add featured columns to stories if needed
     await query(createSettingsTable);
     await query(createPagesTable);
+    await query(addProfileImageColumn); // Add profile_image_public_id column if needed
     console.log('Database schema initialized successfully');
   } catch (error) {
     console.error('Error initializing database schema:', error);

@@ -47,8 +47,8 @@ export default function SiteHeader() {
               src="/zuschuss-logo.PNG"
               alt="ZUSCHUSS"
               width={120}
-              height={26}
-              className="h-[26px] w-auto object-contain"
+              height={21}
+              className="h-[21px] w-auto object-contain"
               priority
             />
           </Link>
@@ -57,7 +57,7 @@ export default function SiteHeader() {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setIsStoriesDropdownOpen(!isStoriesDropdownOpen)}
-                className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-medium"
+                className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-bold uppercase"
               >
                 Stories
               </button>
@@ -86,14 +86,14 @@ export default function SiteHeader() {
             
             <Link
               href="/about"
-              className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-medium"
+              className="text-white hover:text-gray-300 focus:outline-none focus:text-gray-300 text-sm font-bold uppercase"
             >
               About
             </Link>
 
             <div className="flex items-center gap-4">
               <a
-                href="https://instagram.com"
+                href="https://www.instagram.com/zinchiang/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white hover:text-gray-300 transition-colors"
@@ -104,7 +104,7 @@ export default function SiteHeader() {
                 </svg>
               </a>
               <a
-                href="https://bsky.app"
+                href="https://bsky.app/profile/zinchiang.bsky.social"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white hover:text-gray-300 transition-colors"
@@ -115,7 +115,7 @@ export default function SiteHeader() {
                 </svg>
               </a>
               <a
-                href="https://substack.com"
+                href="https://substack.com/@zinchiang1"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-white hover:text-gray-300 transition-colors"

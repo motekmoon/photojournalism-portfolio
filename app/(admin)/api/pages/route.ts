@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { slug, content } = body;
+    const { slug, content, profile_image_public_id } = body;
 
     if (!slug) {
       return NextResponse.json({ error: 'slug is required' }, { status: 400 });
@@ -43,23 +43,50 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'content is required' }, { status: 400 });
     }
 
+    // First, try to ensure the column exists
+    try {
+      await query(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'pages' AND column_name = 'profile_image_public_id'
+          ) THEN
+            ALTER TABLE pages ADD COLUMN profile_image_public_id VARCHAR(255);
+          END IF;
+        END $$;
+      `);
+    } catch (migrationError: any) {
+      console.warn('Migration check failed (column may already exist):', migrationError.message);
+    }
+
     const upsertPage = `
-      INSERT INTO pages (slug, content, updated_at)
-      VALUES ($1, $2, NOW())
+      INSERT INTO pages (slug, content, profile_image_public_id, updated_at)
+      VALUES ($1, $2, $3, NOW())
       ON CONFLICT (slug) 
       DO UPDATE SET
         content = EXCLUDED.content,
+        profile_image_public_id = EXCLUDED.profile_image_public_id,
         updated_at = NOW()
       RETURNING *
     `;
 
-    const page = await queryOne<Page>(upsertPage, [slug, content]);
+    const page = await queryOne<Page>(upsertPage, [slug, content, profile_image_public_id || null]);
 
     return NextResponse.json({ page });
   } catch (error: any) {
     console.error('Error updating page:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+    });
     return NextResponse.json(
-      { error: error.message || 'Failed to update page' },
+      { 
+        error: error.message || 'Failed to update page',
+        details: error.detail || error.hint || 'Check server logs for more information'
+      },
       { status: 500 }
     );
   }

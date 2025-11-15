@@ -73,6 +73,7 @@ export interface Setting {
 export interface Page {
   slug: string;
   content: string;
+  profile_image_public_id: string | null;
   updated_at: Date;
 }
 
