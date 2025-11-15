@@ -130,9 +130,9 @@ export async function POST(request: NextRequest) {
     let result: any;
     try {
       result = await uploadImage(buffer, {
-        folder: folder || 'portfolio',
-        extractMetadata: true,
-      });
+      folder: folder || 'portfolio',
+      extractMetadata: true,
+    });
     } catch (uploadError: any) {
       console.error('Error uploading to Cloudinary:', uploadError);
       throw new Error(`Cloudinary upload failed: ${uploadError.message || 'Unknown error'}`);
@@ -368,7 +368,7 @@ export async function POST(request: NextRequest) {
       for (const [key, value] of Object.entries(extractedMetadata)) {
         if (value !== null && value !== undefined) {
           cleanMetadata[key] = value;
-        }
+    }
       }
       
       extractedMetadataJson = Object.keys(cleanMetadata).length > 0 
@@ -405,7 +405,7 @@ export async function POST(request: NextRequest) {
         updated_at = NOW()
       RETURNING *
     `;
-    
+
     let params: any[] = [
       result.public_id,
       result.secure_url,

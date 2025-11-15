@@ -95,12 +95,12 @@ export async function PUT(
 
       if (updateFields.length > 0) {
         params.push(img.id, id);
-        await query(
-          `UPDATE story_images 
+      await query(
+        `UPDATE story_images 
            SET ${updateFields.join(', ')} 
            WHERE id = $${paramIndex} AND story_id = $${paramIndex + 1}`,
           params
-        );
+      );
       }
     }
 
