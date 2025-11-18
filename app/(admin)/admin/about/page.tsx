@@ -43,11 +43,16 @@ export default function AboutPageEditor() {
       const { compressImage } = await import('@/lib/image-compression');
       console.log(`Compressing ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)...`);
       const compressedFile = await compressImage(file, {
-        maxSizeMB: 3.5,
-        maxWidthOrHeight: 3000,
-        quality: 0.85,
+        maxSizeMB: 3.0, // More conservative
+        maxWidthOrHeight: 2500, // Smaller max dimension
+        quality: 0.80, // Lower quality for better compression
       });
       console.log(`Compressed to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      
+      // Double-check size before upload
+      if (compressedFile.size > 4 * 1024 * 1024) {
+        throw new Error(`File is still too large after compression: ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB. Please use a smaller image.`);
+      }
 
       const formData = new FormData();
       formData.append('file', compressedFile);

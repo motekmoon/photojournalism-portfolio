@@ -18,13 +18,13 @@ export async function compressImage(
   options: CompressionOptions = {}
 ): Promise<File> {
   const {
-    maxSizeMB = 3.5, // Slightly under 4MB to be safe
-    maxWidthOrHeight = 3000,
-    quality = 0.85,
+    maxSizeMB = 3.0, // More conservative - 3MB to be well under 4.5MB limit
+    maxWidthOrHeight = 2500, // Smaller max dimension
+    quality = 0.80, // Lower quality for better compression
   } = options;
 
-  // If file is already small enough, return as-is
-  if (file.size <= maxSizeMB * 1024 * 1024) {
+  // Always compress if file is over 2MB to ensure we're well under the limit
+  if (file.size <= 2 * 1024 * 1024) {
     return file;
   }
 
@@ -60,54 +60,80 @@ export async function compressImage(
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Convert to blob with compression
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              reject(new Error('Compression failed'));
-              return;
-            }
+        // Convert to blob with compression - use iterative approach
+        const tryCompress = (targetQuality: number, attempt: number = 1): void => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                reject(new Error('Compression failed'));
+                return;
+              }
 
-            // If still too large, compress more aggressively
-            if (blob.size > maxSizeMB * 1024 * 1024) {
-              // Try again with lower quality
-              canvas.toBlob(
-                (blob2) => {
-                  if (!blob2) {
-                    reject(new Error('Compression failed'));
-                    return;
-                  }
-
-                  // Create a new File with the same name
+              // If still too large and we haven't tried too many times, compress more
+              if (blob.size > maxSizeMB * 1024 * 1024 && attempt < 5) {
+                // Reduce dimensions and quality further
+                const newWidth = Math.floor(width * 0.9);
+                const newHeight = Math.floor(height * 0.9);
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                ctx.clearRect(0, 0, newWidth, newHeight);
+                ctx.drawImage(img, 0, 0, newWidth, newHeight);
+                
+                // Try with even lower quality
+                tryCompress(targetQuality * 0.85, attempt + 1);
+              } else {
+                // If still too large after all attempts, resize more aggressively
+                if (blob.size > maxSizeMB * 1024 * 1024) {
+                  // Last resort: resize to smaller dimensions
+                  const finalWidth = Math.min(width, 2000);
+                  const finalHeight = Math.min(height, 2000);
+                  canvas.width = finalWidth;
+                  canvas.height = finalHeight;
+                  ctx.clearRect(0, 0, finalWidth, finalHeight);
+                  ctx.drawImage(img, 0, 0, finalWidth, finalHeight);
+                  
+                  canvas.toBlob(
+                    (finalBlob) => {
+                      if (!finalBlob) {
+                        reject(new Error('Compression failed'));
+                        return;
+                      }
+                      
+                      const compressedFile = new File(
+                        [finalBlob],
+                        file.name,
+                        {
+                          type: 'image/jpeg', // Always use JPEG for maximum compression
+                          lastModified: Date.now(),
+                        }
+                      );
+                      console.log(`Final compression: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+                      resolve(compressedFile);
+                    },
+                    'image/jpeg',
+                    0.60 // Very low quality for maximum compression
+                  );
+                } else {
+                  // Success! File is small enough
                   const compressedFile = new File(
-                    [blob2],
+                    [blob],
                     file.name,
                     {
-                      type: file.type || 'image/jpeg',
+                      type: 'image/jpeg', // Always use JPEG for better compression
                       lastModified: Date.now(),
                     }
                   );
+                  console.log(`Compression successful: ${(file.size / 1024 / 1024).toFixed(2)}MB -> ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
                   resolve(compressedFile);
-                },
-                file.type || 'image/jpeg',
-                quality * 0.7 // Even lower quality
-              );
-            } else {
-              // Create a new File with the same name
-              const compressedFile = new File(
-                [blob],
-                file.name,
-                {
-                  type: file.type || 'image/jpeg',
-                  lastModified: Date.now(),
                 }
-              );
-              resolve(compressedFile);
-            }
-          },
-          file.type || 'image/jpeg',
-          quality
-        );
+              }
+            },
+            'image/jpeg', // Always use JPEG for better compression
+            targetQuality
+          );
+        };
+        
+        tryCompress(quality);
       };
       img.onerror = () => reject(new Error('Failed to load image'));
       img.src = e.target?.result as string;
