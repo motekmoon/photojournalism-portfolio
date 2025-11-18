@@ -577,9 +577,19 @@ function UploadImageButton({
         setUploadProgress({ current: i + 1, total: files.length });
 
         try {
+          // Compress image on client side before upload
+          const { compressImage } = await import('@/lib/image-compression');
+          console.log(`Compressing ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)...`);
+          const compressedFile = await compressImage(file, {
+            maxSizeMB: 3.5,
+            maxWidthOrHeight: 3000,
+            quality: 0.85,
+          });
+          console.log(`Compressed to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
           // Upload to Cloudinary
           const formData = new FormData();
-          formData.append('file', file);
+          formData.append('file', compressedFile);
           formData.append('folder', 'portfolio');
 
           const uploadResponse = await fetch('/api/cloudinary/upload', {

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { CldImage } from 'next-cloudinary';
 import type { Media } from '@/types';
+import { compressImage } from '@/lib/image-compression';
 
 export default function MediaPage() {
   const [media, setMedia] = useState<Media[]>([]);
@@ -68,8 +69,17 @@ export default function MediaPage() {
         setUploadProgress({ current: i + 1, total: files.length });
 
         try {
+          // Compress image on client side before upload
+          console.log(`Compressing ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)...`);
+          const compressedFile = await compressImage(file, {
+            maxSizeMB: 3.5,
+            maxWidthOrHeight: 3000,
+            quality: 0.85,
+          });
+          console.log(`Compressed to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
           const formData = new FormData();
-          formData.append('file', file);
+          formData.append('file', compressedFile);
           formData.append('folder', 'portfolio');
 
           console.log(`Starting upload ${i + 1}/${files.length} for file:`, file.name, 'Size:', file.size);

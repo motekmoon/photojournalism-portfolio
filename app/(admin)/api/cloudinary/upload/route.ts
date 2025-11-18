@@ -23,13 +23,18 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     let buffer = Buffer.from(bytes);
 
-    // Check file size and compress if needed (Cloudinary limit is 10MB)
-    const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    // Check file size and compress if needed
+    // Vercel has a 4.5MB limit for serverless function request bodies
+    // Cloudinary has a 10MB limit for uploads
+    // So we need to compress files over 4MB to ensure they pass Vercel's limit
+    const VERCEL_MAX_SIZE = 4 * 1024 * 1024; // 4MB (slightly under 4.5MB limit for safety)
+    const CLOUDINARY_MAX_SIZE = 10 * 1024 * 1024; // 10MB (Cloudinary's limit)
     const originalSize = buffer.length;
     
     console.log(`Upload attempt: ${file.name}, size: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
     
-    if (buffer.length > MAX_SIZE) {
+    // Compress if file is larger than Vercel's limit (4MB)
+    if (buffer.length > VERCEL_MAX_SIZE) {
       try {
         // Use sharp to compress/resize the image
         const sharp = (await import('sharp')).default;
@@ -68,42 +73,19 @@ export async function POST(request: NextRequest) {
         buffer = Buffer.from(await processedImage.toBuffer());
 
         // If still too large, compress more aggressively (but keep metadata)
-        if (buffer.length > MAX_SIZE) {
+        if (buffer.length > VERCEL_MAX_SIZE) {
           processedImage = sharp(buffer)
             .withMetadata() // Preserve all metadata through second compression pass
-            .resize(3000, 3000, {
+            .resize(2500, 2500, {
               fit: 'inside',
               withoutEnlargement: true,
             });
           
-          // Preserve format
-          if (isJpeg) {
-            processedImage = processedImage.jpeg({ quality: 75, mozjpeg: true });
-          } else if (isPng) {
-            processedImage = processedImage.png({ quality: 80, compressionLevel: 9 });
-          } else if (isWebp) {
-            processedImage = processedImage.webp({ quality: 75 });
-          } else {
-            processedImage = processedImage.jpeg({ quality: 75, mozjpeg: true });
-          }
-          
-          buffer = Buffer.from(await processedImage.toBuffer());
-        }
-
-        // If still too large, one more aggressive compression (but keep metadata)
-        if (buffer.length > MAX_SIZE) {
-          processedImage = sharp(buffer)
-            .withMetadata() // Preserve all metadata through third compression pass
-            .resize(2000, 2000, {
-              fit: 'inside',
-              withoutEnlargement: true,
-            });
-          
-          // Preserve format
+          // Preserve format - more aggressive quality
           if (isJpeg) {
             processedImage = processedImage.jpeg({ quality: 70, mozjpeg: true });
           } else if (isPng) {
-            processedImage = processedImage.png({ quality: 70, compressionLevel: 9 });
+            processedImage = processedImage.png({ quality: 75, compressionLevel: 9 });
           } else if (isWebp) {
             processedImage = processedImage.webp({ quality: 70 });
           } else {
@@ -113,14 +95,60 @@ export async function POST(request: NextRequest) {
           buffer = Buffer.from(await processedImage.toBuffer());
         }
 
+        // If still too large, one more aggressive compression (but keep metadata)
+        if (buffer.length > VERCEL_MAX_SIZE) {
+          processedImage = sharp(buffer)
+            .withMetadata() // Preserve all metadata through third compression pass
+            .resize(2000, 2000, {
+              fit: 'inside',
+              withoutEnlargement: true,
+            });
+          
+          // Preserve format - even more aggressive quality
+          if (isJpeg) {
+            processedImage = processedImage.jpeg({ quality: 65, mozjpeg: true });
+          } else if (isPng) {
+            processedImage = processedImage.png({ quality: 70, compressionLevel: 9 });
+          } else if (isWebp) {
+            processedImage = processedImage.webp({ quality: 65 });
+          } else {
+            processedImage = processedImage.jpeg({ quality: 65, mozjpeg: true });
+          }
+          
+          buffer = Buffer.from(await processedImage.toBuffer());
+        }
+        
+        // Last resort - very aggressive compression
+        if (buffer.length > VERCEL_MAX_SIZE) {
+          processedImage = sharp(buffer)
+            .withMetadata() // Preserve all metadata through fourth compression pass
+            .resize(1500, 1500, {
+              fit: 'inside',
+              withoutEnlargement: true,
+            });
+          
+          // Preserve format - maximum compression
+          if (isJpeg) {
+            processedImage = processedImage.jpeg({ quality: 60, mozjpeg: true });
+          } else if (isPng) {
+            processedImage = processedImage.png({ quality: 65, compressionLevel: 9 });
+          } else if (isWebp) {
+            processedImage = processedImage.webp({ quality: 60 });
+          } else {
+            processedImage = processedImage.jpeg({ quality: 60, mozjpeg: true });
+          }
+          
+          buffer = Buffer.from(await processedImage.toBuffer());
+        }
+
         console.log(`Compressed image from ${(originalSize / 1024 / 1024).toFixed(2)}MB to ${(buffer.length / 1024 / 1024).toFixed(2)}MB (metadata preserved)`);
       } catch (sharpError) {
         console.warn('Sharp compression failed:', sharpError);
         // If sharp fails and file is still too large, return error
-        if (buffer.length > MAX_SIZE) {
+        if (buffer.length > VERCEL_MAX_SIZE) {
           return NextResponse.json(
             { 
-              error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 10MB. Please compress the image before uploading.` 
+              error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 4MB for upload. Please compress the image before uploading.` 
             },
             { status: 413 }
           );
@@ -129,10 +157,10 @@ export async function POST(request: NextRequest) {
     }
     
     // Final check - if still too large after compression, reject
-    if (buffer.length > MAX_SIZE) {
+    if (buffer.length > VERCEL_MAX_SIZE) {
       return NextResponse.json(
         { 
-          error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 10MB. Please compress the image before uploading.` 
+          error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 4MB for upload. Please compress the image before uploading.` 
         },
         { status: 413 }
       );
