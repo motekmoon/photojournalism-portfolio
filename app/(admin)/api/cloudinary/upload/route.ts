@@ -468,6 +468,23 @@ export async function POST(request: NextRequest) {
     const iptcDataJson = extractedMetadataJson;
     const allMetadataJson = extractedMetadataJson;
     
+    // Validate public_id before saving
+    if (!result.public_id || typeof result.public_id !== 'string') {
+      console.error('Invalid public_id:', result.public_id);
+      throw new Error('Invalid public_id from Cloudinary upload');
+    }
+    
+    // Use secure_url if available, otherwise use url
+    const imageUrl = result.secure_url || result.url;
+    if (!imageUrl) {
+      console.error('No URL in upload result:', result);
+      throw new Error('No URL returned from Cloudinary upload');
+    }
+    
+    console.log('=== SAVING TO DATABASE ===');
+    console.log('Public ID:', result.public_id);
+    console.log('URL:', imageUrl);
+    
     // Save to database - store ALL metadata in all_metadata column
     // Try with all_metadata column first, fallback if it doesn't exist
     let insertMedia = `
@@ -492,7 +509,7 @@ export async function POST(request: NextRequest) {
 
     let params: any[] = [
       result.public_id,
-      result.secure_url,
+      imageUrl,
       caption,
       exifDataJson,
       iptcDataJson,
@@ -564,10 +581,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    console.log('=== UPLOAD COMPLETE ===');
+    console.log('Saved media ID:', media[0].id);
+    console.log('Saved public ID:', media[0].cloudinary_public_id);
+    console.log('Saved URL:', media[0].cloudinary_url);
+    
     return NextResponse.json({
       success: true,
       media: media[0],
-      uploadResult: result,
+      uploadResult: {
+        public_id: result.public_id,
+        secure_url: result.secure_url || result.url,
+        format: result.format,
+        width: result.width,
+        height: result.height,
+      },
     });
   } catch (error: any) {
     console.error('=== UPLOAD ERROR ===');
