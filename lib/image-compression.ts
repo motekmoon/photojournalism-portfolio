@@ -25,8 +25,11 @@ export async function compressImage(
 
   // Always compress if file is over 2MB to ensure we're well under the limit
   if (file.size <= 2 * 1024 * 1024) {
+    console.log(`File ${file.name} is already small enough (${(file.size / 1024 / 1024).toFixed(2)}MB), skipping compression`);
     return file;
   }
+
+  console.log(`Starting compression for ${file.name}: ${(file.size / 1024 / 1024).toFixed(2)}MB`);
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -135,10 +138,16 @@ export async function compressImage(
         
         tryCompress(quality);
       };
-      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onerror = (err) => {
+        console.error('Error loading image:', err);
+        reject(new Error('Failed to load image'));
+      };
       img.src = e.target?.result as string;
     };
-    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onerror = (err) => {
+      console.error('Error reading file:', err);
+      reject(new Error('Failed to read file'));
+    };
     reader.readAsDataURL(file);
   });
 }
