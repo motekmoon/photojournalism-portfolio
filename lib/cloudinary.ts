@@ -2,10 +2,23 @@ import { v2 as cloudinary } from 'cloudinary';
 import type { CloudinaryUploadResult } from '@/types';
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+// Prefer CLOUDINARY_URL if available, otherwise use individual env vars
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config();
+} else {
+  cloudinary.config({
+    cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+}
+
+// Log configuration status (without exposing secrets)
+console.log('Cloudinary config:', {
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL ? 'set' : 'missing',
+  api_key: process.env.CLOUDINARY_API_KEY ? 'set' : 'missing',
+  api_secret: process.env.CLOUDINARY_API_SECRET ? 'set' : 'missing',
+  cloudinary_url: process.env.CLOUDINARY_URL ? 'set' : 'missing',
 });
 
 export { cloudinary };

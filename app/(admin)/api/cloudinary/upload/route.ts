@@ -27,6 +27,8 @@ export async function POST(request: NextRequest) {
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
     const originalSize = buffer.length;
     
+    console.log(`Upload attempt: ${file.name}, size: ${(originalSize / 1024 / 1024).toFixed(2)}MB`);
+    
     if (buffer.length > MAX_SIZE) {
       try {
         // Use sharp to compress/resize the image
@@ -120,21 +122,54 @@ export async function POST(request: NextRequest) {
             { 
               error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 10MB. Please compress the image before uploading.` 
             },
-            { status: 400 }
+            { status: 413 }
           );
         }
       }
+    }
+    
+    // Final check - if still too large after compression, reject
+    if (buffer.length > MAX_SIZE) {
+      return NextResponse.json(
+        { 
+          error: `File is too large (${(buffer.length / 1024 / 1024).toFixed(2)}MB). Maximum size is 10MB. Please compress the image before uploading.` 
+        },
+        { status: 413 }
+      );
     }
 
     // Upload to Cloudinary with metadata extraction
     let result: any;
     try {
+      // Log environment variable status (without exposing secrets)
+      console.log('Cloudinary env check:', {
+        cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ? 'set' : 'missing',
+        api_key: process.env.CLOUDINARY_API_KEY ? `set (${process.env.CLOUDINARY_API_KEY.substring(0, 6)}...)` : 'missing',
+        api_secret: process.env.CLOUDINARY_API_SECRET ? 'set' : 'missing',
+        cloudinary_url: process.env.CLOUDINARY_URL ? 'set' : 'missing',
+      });
+      
       result = await uploadImage(buffer, {
-      folder: folder || 'portfolio',
-      extractMetadata: true,
-    });
+        folder: folder || 'portfolio',
+        extractMetadata: true,
+      });
     } catch (uploadError: any) {
       console.error('Error uploading to Cloudinary:', uploadError);
+      console.error('Upload error details:', {
+        message: uploadError.message,
+        http_code: uploadError.http_code,
+        name: uploadError.name,
+        error: uploadError.error,
+      });
+      
+      // Provide more helpful error messages
+      if (uploadError.message?.includes('Unknown API key')) {
+        throw new Error(`Cloudinary authentication failed: Please verify your API key and secret are correct and match your Cloudinary account.`);
+      }
+      if (uploadError.http_code === 401) {
+        throw new Error(`Cloudinary authentication failed: Invalid API credentials. Please check your CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.`);
+      }
+      
       throw new Error(`Cloudinary upload failed: ${uploadError.message || 'Unknown error'}`);
     }
 
