@@ -181,6 +181,27 @@ export async function POST(request: NextRequest) {
         folder: folder || 'portfolio',
         extractMetadata: true,
       });
+      
+      // Validate upload result
+      if (!result || !result.public_id) {
+        console.error('Upload result is invalid:', result);
+        throw new Error('Cloudinary upload returned invalid result - missing public_id');
+      }
+      
+      console.log('=== CLOUDINARY UPLOAD SUCCESS ===');
+      console.log('Public ID:', result.public_id);
+      console.log('Secure URL:', result.secure_url);
+      console.log('URL:', result.url);
+      console.log('Format:', result.format);
+      console.log('Width:', result.width);
+      console.log('Height:', result.height);
+      console.log('Bytes:', result.bytes);
+      
+      // Verify the image is accessible
+      if (!result.secure_url && !result.url) {
+        console.error('Upload result missing URL:', result);
+        throw new Error('Cloudinary upload returned invalid result - missing URL');
+      }
     } catch (uploadError: any) {
       console.error('Error uploading to Cloudinary:', uploadError);
       console.error('Upload error details:', {
@@ -504,7 +525,7 @@ export async function POST(request: NextRequest) {
         `;
         params = [
           result.public_id,
-          result.secure_url,
+          imageUrl,
           caption,
           exifDataJson,
           allMetadataJson || iptcDataJson, // Store all metadata in iptc_data if column doesn't exist
